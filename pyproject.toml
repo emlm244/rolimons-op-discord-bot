@@ -1,0 +1,37 @@
+
+[project]
+name = "rolimons-op-discord-bot"
+version = "0.1.0"
+authors = [{ name = "Rolimon's Bot" }]
+requires-python = ">=3.11"
+readme = "README.md"
+
+[tool.black]
+target-version = ["py311"]
+line-length = 100
+
+[tool.isort]
+profile = "black"
+line_length = 100
+known_first_party = ["rolimons_op_bot"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "B", "UP", "SIM", "PL", "RUF"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["PLR2004"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unused_configs = true
+packages = ["rolimons_op_bot"]
+disallow_untyped_defs = true
+disallow_untyped_calls = true
+no_implicit_optional = true
+show_error_codes = true
