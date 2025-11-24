@@ -1,0 +1,33 @@
+[project]
+name = "rolimons-op-discord-bot"
+version = "0.1.0"
+description = "Discord slash-command bot that computes Rolimon's OP bands."
+authors = [{ name = "AutoDev", email = "dev@example.com" }]
+requires-python = ">=3.12"
+dependencies = [
+  "nextcord==2.6.0",
+  "httpx==0.27.2",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest==8.3.3",
+  "ruff==0.6.9",
+  "mypy==1.11.2",
+]
+
+[build-system]
+requires = ["setuptools>=65"]
+build-backend = "setuptools.build_meta"
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "N", "ANN", "S", "W"]
+ignore = ["ANN101", "ANN102", "ANN401", "S101"]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+strict = false
