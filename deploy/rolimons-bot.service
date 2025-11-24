@@ -1,0 +1,14 @@
+[Unit]
+Description=Rolimons OP Discord Bot
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/rolimons-op-bot
+EnvironmentFile=/opt/rolimons-op-bot/.env
+ExecStart=/opt/rolimons-op-bot/.venv/bin/python -m src.bot
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
