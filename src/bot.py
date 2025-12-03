@@ -13,6 +13,8 @@ from discord import app_commands
 from src.config import config
 from src.sniper.engine import SniperEngine, Opportunity
 from src.data.roblox_client import PurchaseResult
+from src.data.models import PurchaseRecord
+from src.analytics.tracker import AnalyticsTracker
 
 # Configure logging
 logging.basicConfig(
@@ -38,6 +40,7 @@ class RISniperBot(discord.Client):
 
         self.tree = app_commands.CommandTree(self)
         self.engine: Optional[SniperEngine] = None
+        self.tracker: Optional[AnalyticsTracker] = None
         self.alert_channel: Optional[discord.TextChannel] = None
 
         # Pending confirmations (opportunity_id -> Opportunity)
@@ -45,6 +48,11 @@ class RISniperBot(discord.Client):
 
     async def setup_hook(self) -> None:
         """Called when the bot is ready to set up."""
+        # Initialize analytics tracker (for P&L tracking)
+        self.tracker = AnalyticsTracker()
+        await self.tracker.start()
+        logger.info("Analytics tracker initialized")
+
         # Initialize sniper engine
         self.engine = SniperEngine()
 
@@ -124,6 +132,31 @@ class RISniperBot(discord.Client):
     ) -> None:
         """Handle purchase result from engine."""
         from src.utils.embeds import build_success_embed, build_error_embed
+        from datetime import datetime
+        import uuid
+
+        # Record purchase in analytics tracker
+        if self.tracker:
+            strategy = (
+                config.strategy_flags_list[0]
+                if config.strategy_flags_list
+                else "unknown"
+            )
+            record = PurchaseRecord(
+                record_id=str(uuid.uuid4()),
+                item_id=opportunity.item.item_id,
+                item_name=opportunity.item.name,
+                purchase_price=opportunity.listing.price,
+                purchase_time=datetime.utcnow(),
+                seller_id=opportunity.listing.seller_id,
+                snipe_score=opportunity.score,
+                strategy_used=strategy,
+                success=(result == PurchaseResult.SUCCESS),
+                current_value=opportunity.item.value,
+                current_rap=opportunity.item.rap,
+            )
+            self.tracker.record_purchase(record)
+            logger.info(f"Recorded purchase: {opportunity.item.name} - {'SUCCESS' if result == PurchaseResult.SUCCESS else 'FAILED'}")
 
         if not self.alert_channel:
             return
@@ -145,6 +178,8 @@ class RISniperBot(discord.Client):
 
     async def close(self) -> None:
         """Clean up on shutdown."""
+        if self.tracker:
+            await self.tracker.close()
         if self.engine:
             await self.engine.close()
         await super().close()

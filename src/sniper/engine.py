@@ -364,10 +364,43 @@ class SniperEngine:
         return len(self._purchases_this_hour) < config.max_purchases_per_hour
 
     async def manual_purchase(self, opportunity: Opportunity) -> PurchaseResult:
-        """Manually trigger a purchase (for confirm button)."""
-        await self._execute_purchase(opportunity)
-        # Return the last result - this is a simplification
-        return PurchaseResult.SUCCESS
+        """Manually trigger a purchase (for confirm button).
+
+        Returns:
+            The actual PurchaseResult from the Roblox API.
+        """
+        # Budget checks
+        if not self._check_budget(opportunity.listing.price):
+            return PurchaseResult.INSUFFICIENT_FUNDS
+
+        # Rate limit check
+        if not self._check_purchase_rate():
+            return PurchaseResult.RATE_LIMITED
+
+        self.stats.purchases_attempted += 1
+
+        # Execute purchase and return actual result
+        result = await self.roblox.purchase(
+            product_id=opportunity.listing.product_id,
+            expected_price=opportunity.listing.price,
+            expected_seller_id=opportunity.listing.seller_id,
+            user_asset_id=opportunity.listing.user_asset_id,
+        )
+
+        if result.result == PurchaseResult.SUCCESS:
+            self.stats.purchases_successful += 1
+            self._session_spent += opportunity.listing.price
+            self.stats.total_spent += opportunity.listing.price
+            self._purchases_this_hour.append(datetime.utcnow())
+
+        # Notify via callback
+        if self._on_purchase:
+            try:
+                await self._on_purchase(opportunity, result.result)
+            except Exception as e:
+                logger.error(f"Error in purchase callback: {e}")
+
+        return result.result
 
     def get_status(self) -> dict:
         """Get current engine status."""

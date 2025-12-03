@@ -4,44 +4,34 @@ from __future__ import annotations
 
 import discord
 from discord import app_commands
+from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
-from src.data.models import PortfolioStats
+from src.data.models import PortfolioStats, PurchaseRecord
 from src.utils.embeds import build_stats_embed, build_error_embed
 
+if TYPE_CHECKING:
+    from src.bot import RISniperBot
 
-def setup_stats_commands(bot) -> None:
+
+def setup_stats_commands(bot: "RISniperBot") -> None:
     """Set up /stats commands on the bot."""
 
     stats_group = app_commands.Group(name="stats", description="View sniper statistics")
 
     @stats_group.command(name="overview", description="View portfolio overview")
     async def stats_overview(interaction: discord.Interaction) -> None:
-        """Show portfolio overview."""
+        """Show portfolio overview with real P&L data."""
         await interaction.response.defer()
 
-        if not bot.engine:
+        if not bot.tracker:
             await interaction.followup.send(
-                embed=build_error_embed("Error", "Engine not initialized"),
+                embed=build_error_embed("Error", "Analytics tracker not initialized"),
             )
             return
 
-        # Calculate stats from engine
-        status = bot.engine.get_status()
-        engine_stats = status.get("stats", {})
-
-        # Create portfolio stats
-        portfolio = PortfolioStats(
-            total_spent=engine_stats.get("total_spent", 0),
-            current_value=engine_stats.get("total_spent", 0),  # Would need to track actual current values
-            unrealized_pnl=0,  # Would need periodic value updates
-            realized_pnl=0,
-            total_purchases=engine_stats.get("purchases_attempted", 0),
-            successful_purchases=engine_stats.get("purchases_successful", 0),
-            failed_purchases=engine_stats.get("purchases_attempted", 0) - engine_stats.get("purchases_successful", 0),
-            winning_trades=0,  # Would need to track
-            losing_trades=0,
-        )
-
+        # Get real stats from tracker
+        portfolio = bot.tracker.get_portfolio_stats()
         embed = build_stats_embed(portfolio)
         await interaction.followup.send(embed=embed)
 
@@ -117,39 +107,150 @@ def setup_stats_commands(bot) -> None:
 
     @stats_group.command(name="purchases", description="View recent purchases")
     async def stats_purchases(interaction: discord.Interaction) -> None:
-        """Show recent purchases."""
+        """Show recent purchases from tracker."""
         await interaction.response.defer()
 
-        # This would require storing purchase records
+        if not bot.tracker:
+            await interaction.followup.send(
+                embed=build_error_embed("Error", "Analytics tracker not initialized"),
+            )
+            return
+
+        purchases = bot.tracker.get_all_purchases()
+
+        if not purchases:
+            embed = discord.Embed(
+                title="Recent Purchases",
+                description="No purchases recorded yet.",
+                color=discord.Color.blue(),
+            )
+            await interaction.followup.send(embed=embed)
+            return
+
+        # Show last 10 purchases
+        recent = sorted(purchases, key=lambda p: p.purchase_time, reverse=True)[:10]
+
         embed = discord.Embed(
             title="Recent Purchases",
-            description="Purchase tracking coming soon!",
+            description=f"Showing {len(recent)} of {len(purchases)} total purchases",
             color=discord.Color.blue(),
+            timestamp=datetime.now(timezone.utc),
         )
+
+        for record in recent:
+            status_emoji = "" if record.success else ""
+            pnl = record.unrealized_pnl
+            pnl_emoji = "" if pnl >= 0 else ""
+
+            value = (
+                f"**Price:** {record.purchase_price:,} R$\n"
+                f"**Current Value:** {record.current_value:,} R$\n"
+                f"**P&L:** {pnl_emoji} {pnl:+,} R$ ({record.unrealized_pnl_percent:+.1f}%)\n"
+                f"**Score:** {record.snipe_score}/100"
+            )
+
+            embed.add_field(
+                name=f"{status_emoji} {record.item_name}",
+                value=value,
+                inline=True,
+            )
 
         await interaction.followup.send(embed=embed)
 
     @stats_group.command(name="best", description="View best performing snipes")
     async def stats_best(interaction: discord.Interaction) -> None:
-        """Show best snipes."""
+        """Show best snipes from tracker."""
+        await interaction.response.defer()
+
+        if not bot.tracker:
+            await interaction.followup.send(
+                embed=build_error_embed("Error", "Analytics tracker not initialized"),
+            )
+            return
+
+        best_snipes = bot.tracker.get_best_snipes(limit=5)
+
+        if not best_snipes:
+            embed = discord.Embed(
+                title="Best Snipes",
+                description="No successful purchases to show yet.",
+                color=discord.Color.green(),
+            )
+            await interaction.followup.send(embed=embed)
+            return
+
         embed = discord.Embed(
             title="Best Snipes",
-            description="Performance tracking coming soon!",
+            description="Top 5 most profitable snipes",
             color=discord.Color.green(),
+            timestamp=datetime.now(timezone.utc),
         )
 
-        await interaction.response.send_message(embed=embed)
+        for i, record in enumerate(best_snipes, 1):
+            pnl = record.unrealized_pnl
+
+            value = (
+                f"**Bought:** {record.purchase_price:,} R$\n"
+                f"**Now Worth:** {record.current_value:,} R$\n"
+                f"**Profit:** +{pnl:,} R$ ({record.unrealized_pnl_percent:+.1f}%)\n"
+                f"**Score:** {record.snipe_score}/100"
+            )
+
+            embed.add_field(
+                name=f"#{i} {record.item_name}",
+                value=value,
+                inline=False,
+            )
+
+        await interaction.followup.send(embed=embed)
 
     @stats_group.command(name="worst", description="View worst performing snipes")
     async def stats_worst(interaction: discord.Interaction) -> None:
-        """Show worst snipes."""
+        """Show worst snipes from tracker."""
+        await interaction.response.defer()
+
+        if not bot.tracker:
+            await interaction.followup.send(
+                embed=build_error_embed("Error", "Analytics tracker not initialized"),
+            )
+            return
+
+        worst_snipes = bot.tracker.get_worst_snipes(limit=5)
+
+        if not worst_snipes:
+            embed = discord.Embed(
+                title="Worst Snipes",
+                description="No purchases to analyze yet.",
+                color=discord.Color.red(),
+            )
+            await interaction.followup.send(embed=embed)
+            return
+
         embed = discord.Embed(
             title="Worst Snipes",
-            description="Performance tracking coming soon!",
+            description="Bottom 5 performing snipes",
             color=discord.Color.red(),
+            timestamp=datetime.now(timezone.utc),
         )
 
-        await interaction.response.send_message(embed=embed)
+        for i, record in enumerate(worst_snipes, 1):
+            pnl = record.unrealized_pnl
+            pnl_emoji = "" if pnl >= 0 else ""
+
+            value = (
+                f"**Bought:** {record.purchase_price:,} R$\n"
+                f"**Now Worth:** {record.current_value:,} R$\n"
+                f"**P&L:** {pnl_emoji} {pnl:+,} R$ ({record.unrealized_pnl_percent:+.1f}%)\n"
+                f"**Score:** {record.snipe_score}/100"
+            )
+
+            embed.add_field(
+                name=f"#{i} {record.item_name}",
+                value=value,
+                inline=False,
+            )
+
+        await interaction.followup.send(embed=embed)
 
     # Add group to bot
     bot.tree.add_command(stats_group)
