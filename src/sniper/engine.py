@@ -324,6 +324,7 @@ class SniperEngine:
             product_id=opportunity.listing.product_id,
             expected_price=opportunity.listing.price,
             expected_seller_id=opportunity.listing.seller_id,
+            user_asset_id=opportunity.listing.user_asset_id,
         )
 
         if result.result == PurchaseResult.SUCCESS:

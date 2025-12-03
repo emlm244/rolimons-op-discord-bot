@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  risniper:
+    build: .
+    container_name: risniper
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      # Persist analytics data
+      - ./data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.path.insert(0,'.'); from src.config import config; print('OK')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

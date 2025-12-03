@@ -166,6 +166,11 @@ class RobloxClient:
 
                 for item in data.get("data", []):
                     seller = item.get("seller", {})
+                    # userAssetId is CRITICAL for purchasing limited items
+                    user_asset_id = item.get("userAssetId", 0)
+                    if not user_asset_id:
+                        logger.warning(f"Missing userAssetId for listing, skipping")
+                        continue
                     listings.append(
                         Listing(
                             item_id=asset_id,
@@ -173,6 +178,7 @@ class RobloxClient:
                             seller_name=seller.get("name", "Unknown"),
                             price=item.get("price", 0),
                             product_id=item.get("productId", 0),
+                            user_asset_id=user_asset_id,
                             serial_number=item.get("serialNumber"),
                         )
                     )
@@ -222,13 +228,15 @@ class RobloxClient:
         product_id: int,
         expected_price: int,
         expected_seller_id: int,
+        user_asset_id: int,
     ) -> PurchaseResponse:
-        """Execute a purchase.
+        """Execute a purchase of a limited item.
 
         Args:
             product_id: The product ID from the listing.
             expected_price: The price we expect to pay.
             expected_seller_id: The seller ID we expect.
+            user_asset_id: The specific listing's userAssetId (REQUIRED for limiteds).
 
         Returns:
             PurchaseResponse with result and details.
@@ -237,6 +245,12 @@ class RobloxClient:
             return PurchaseResponse(
                 result=PurchaseResult.AUTH_FAILED,
                 message="ROBLOSECURITY cookie not configured",
+            )
+
+        if not user_asset_id:
+            return PurchaseResponse(
+                result=PurchaseResult.UNKNOWN_ERROR,
+                message="userAssetId is required for limited item purchases",
             )
 
         # Refresh XSRF token
@@ -254,6 +268,7 @@ class RobloxClient:
             "expectedCurrency": 1,  # Robux
             "expectedPrice": expected_price,
             "expectedSellerId": expected_seller_id,
+            "userAssetId": user_asset_id,  # CRITICAL for limited items
         }
 
         headers = {

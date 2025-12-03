@@ -129,6 +129,7 @@ class PurchaseExecutor:
             product_id=listing.product_id,
             expected_price=listing.price,
             expected_seller_id=listing.seller_id,
+            user_asset_id=listing.user_asset_id,
         )
 
         # Create purchase record

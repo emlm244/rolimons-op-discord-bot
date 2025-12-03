@@ -148,6 +148,7 @@ class Listing:
     seller_name: str
     price: int
     product_id: int  # Needed for purchase API
+    user_asset_id: int  # CRITICAL: Required for limited item purchases
     serial_number: Optional[int] = None
 
     @property
